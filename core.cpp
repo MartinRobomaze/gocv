@@ -37,6 +37,10 @@ Mat Mat_NewFromBytes(int rows, int cols, int type, struct ByteArray buf) {
     return new cv::Mat(rows, cols, type, buf.data);
 }
 
+Mat Mat_NewFromInt16Arr(int rows, int cols, int type, int16_t *data) {
+    return new cv::Mat(rows, cols, type, data);
+}
+
 // Mat_NewWithSizesFromScalar creates multidimensional Mat from a scalar
 Mat Mat_NewWithSizesFromScalar(IntVector sizes, int type, Scalar ar) {
     std::vector<int> _sizes;
