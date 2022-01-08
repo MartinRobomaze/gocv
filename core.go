@@ -293,8 +293,8 @@ func NewMatFromBytes(rows int, cols int, mt MatType, data []byte) (Mat, error) {
 	return mat, nil
 }
 
-func NewMatFromInt16Array(rows int, cols int, mt MatType, data []int16) Mat {
-	return newMat(C.Mat_NewFromArray(C.int(rows), C.int(cols), C.int(mt), (*C.int16_t)(unsafe.Pointer(&data[0]))))
+func NewMatFromInt16Arr(rows int, cols int, mt MatType, data []int16) Mat {
+	return newMat(C.Mat_NewFromInt16Arr(C.int(rows), C.int(cols), C.int(mt), (*C.int16_t)(unsafe.Pointer(&data[0]))))
 }
 
 // Returns an identity matrix of the specified size and type.
