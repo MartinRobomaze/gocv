@@ -63,18 +63,21 @@ Mat Mat_NewWithSizesFromBytes(IntVector sizes, int type, struct ByteArray buf) {
 }
 
 Mat Eye(int rows, int cols, int type) {
-    cv::Mat temp = cv::Mat::eye(rows, cols, type);
-    return new cv::Mat(rows, cols, type, temp.data);
+    cv::Mat* mat = new cv::Mat(rows, cols, type);
+    *mat = cv::Mat::eye(rows, cols, type);
+    return mat;
 }
 
 Mat Zeros(int rows, int cols, int type) {
-    cv::Mat temp = cv::Mat::zeros(rows, cols, type);
-    return new cv::Mat(rows, cols, type, temp.data);
+    cv::Mat* mat = new cv::Mat(rows, cols, type);
+    *mat = cv::Mat::zeros(rows, cols, type);
+    return mat;
 }
 
 Mat Ones(int rows, int cols, int type) {
-    cv::Mat temp = cv::Mat::ones(rows, cols, type);
-    return new cv::Mat(rows, cols, type, temp.data);
+    cv::Mat* mat = new cv::Mat(rows, cols, type);
+    *mat = cv::Mat::ones(rows, cols, type);
+    return mat;
 }
 
 Mat Mat_FromPtr(Mat m, int rows, int cols, int type, int prow, int pcol) {
@@ -209,6 +212,10 @@ int Mat_Step(Mat m) {
 
 int Mat_Total(Mat m) {
     return m->total();
+}
+
+int Mat_ElemSize(Mat m){
+    return m->elemSize();
 }
 
 void Mat_Size(Mat m, IntVector* res) {
@@ -501,6 +508,10 @@ void Mat_EigenNonSymmetric(Mat src, Mat eigenvalues, Mat eigenvectors) {
     cv::eigenNonSymmetric(*src, *eigenvalues, *eigenvectors);
 }
 
+void Mat_PCACompute(Mat src, Mat mean, Mat eigenvectors, Mat eigenvalues, int maxComponents) {
+    cv::PCACompute(*src, *mean, *eigenvectors, *eigenvalues, maxComponents);
+}
+
 void Mat_Exp(Mat src, Mat dst) {
     cv::exp(*src, *dst);
 }
@@ -686,6 +697,15 @@ double Mat_SolvePoly(Mat coeffs, Mat roots, int maxIters) {
 void Mat_Reduce(Mat src, Mat dst, int dim, int rType, int dType) {
     cv::reduce(*src, *dst, dim, rType, dType);
 }
+
+void Mat_ReduceArgMax(Mat src, Mat dst, int axis, bool lastIndex) {
+    cv::reduceArgMax(*src, *dst, axis, lastIndex);
+}
+
+void Mat_ReduceArgMin(Mat src, Mat dst, int axis, bool lastIndex) {
+    cv::reduceArgMin(*src, *dst, axis, lastIndex);
+}
+
 
 void Mat_Repeat(Mat src, int nY, int nX, Mat dst) {
     cv::repeat(*src, nY, nX, *dst);
@@ -1142,3 +1162,10 @@ void Points3fVector_Close(Points3fVector ps) {
     delete ps;
 }
 
+void SetNumThreads(int n) {
+    cv::setNumThreads(n);
+}
+
+int GetNumThreads() {
+    return cv::getNumThreads();
+}

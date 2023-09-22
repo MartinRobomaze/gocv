@@ -2,6 +2,8 @@ package gocv
 
 import (
 	"image"
+	"image/color"
+	"math"
 	"testing"
 )
 
@@ -210,6 +212,56 @@ func TestCalcOpticalFlowPyrLKWithParams(t *testing.T) {
 	}
 }
 
+func computeRMS(mat1 Mat, mat2 Mat) float64 {
+	var rms float64
+	for y := 0; y < mat1.Rows(); y++ {
+		for x := 0; x < mat1.Cols(); x++ {
+			diff := float64(mat1.GetFloatAt(y, x) - mat2.GetFloatAt(y, x))
+			rms += diff * diff
+		}
+	}
+
+	rms /= float64(mat1.Rows() * mat1.Cols())
+	return math.Sqrt(rms)
+}
+
+func TestFindTransformECC(t *testing.T) {
+	img := IMRead("images/face.jpg", IMReadGrayScale)
+	if img.Empty() {
+		t.Error("Invalid Mat in FindTransformECC test")
+	}
+	defer img.Close()
+	testImg := NewMat()
+	defer testImg.Close()
+	Resize(img, &testImg, image.Point{216, 216}, 0, 0, InterpolationLinear)
+
+	translationGround := Eye(2, 3, MatTypeCV32F)
+	defer translationGround.Close()
+	translationGround.SetFloatAt(0, 2, 11.4159)
+	translationGround.SetFloatAt(1, 2, 17.1828)
+
+	warpedImage := NewMat()
+	defer warpedImage.Close()
+	WarpAffineWithParams(testImg, &warpedImage, translationGround, image.Point{200, 200}, InterpolationLinear+WarpInverseMap, BorderConstant, color.RGBA{})
+
+	mapTranslation := Eye(2, 3, MatTypeCV32F)
+	defer mapTranslation.Close()
+	eecIterations := 50
+	// Negative value means that ECC_Iterations will be executed.
+	var eecEpsilon float64 = -1
+	criteria := NewTermCriteria(Count+EPS, eecIterations, eecEpsilon)
+	inputMask := NewMat()
+	defer inputMask.Close()
+	gaussFiltSize := 5
+	FindTransformECC(warpedImage, testImg, &mapTranslation, MotionTranslation, criteria, inputMask, gaussFiltSize)
+
+	maxRMSECC := 0.1
+	rms := computeRMS(mapTranslation, translationGround)
+	if rms > maxRMSECC {
+		t.Errorf("FindTransformECC RMS = %f", rms)
+	}
+}
+
 func BaseTestTracker(t *testing.T, tracker Tracker, name string) {
 	if tracker == nil {
 		t.Error("TestTracker " + name + " should not be nil")
@@ -248,4 +300,92 @@ func TestSingleTrackers(t *testing.T) {
 			BaseTestTracker(t, test.tracker, test.name)
 		}()
 	}
+}
+
+func TestKalmanFilter(t *testing.T) {
+	// Basic test with default constructor.
+	kf := NewKalmanFilter(2, 1)
+	kf.Init(2, 1)
+	measurement := Zeros(1, 1, MatTypeCV32F)
+	prediction := kf.Predict()
+	statePost := kf.Correct(measurement)
+	statePost.Close()
+	prediction.Close()
+	measurement.Close()
+	kf.Close()
+
+	// Basic test with param constructor.
+	kf = NewKalmanFilterWithParams(2, 1, 1, MatTypeCV32F)
+	control := Ones(1, 1, MatTypeCV32F)
+	measurement = Ones(1, 1, MatTypeCV32F)
+	prediction = kf.PredictWithParams(control)
+	statePost = kf.Correct(measurement)
+	statePost.Close()
+	prediction.Close()
+	measurement.Close()
+	control.Close()
+	kf.Close()
+}
+
+func TestKalmanFilter_Getters(t *testing.T) {
+	kf := NewKalmanFilterWithParams(2, 1, 1, MatTypeCV32F)
+	getterTests := []struct {
+		desc string
+		f    func() Mat
+	}{
+		{desc: "GetStatePre()", f: kf.GetStatePre},
+		{desc: "GetStatePost()", f: kf.GetStatePost},
+		{desc: "GetTransitionMatrix()", f: kf.GetTransitionMatrix},
+		{desc: "GetControlMatrix()", f: kf.GetControlMatrix},
+		{desc: "GetMeasurementMatrix()", f: kf.GetMeasurementMatrix},
+		{desc: "GetProcessNoiseCov()", f: kf.GetProcessNoiseCov},
+		{desc: "GetMeasurementNoiseCov()", f: kf.GetMeasurementNoiseCov},
+		{desc: "GetErrorCovPre()", f: kf.GetErrorCovPre},
+		{desc: "GetGain()", f: kf.GetGain},
+		{desc: "GetErrorCovPost()", f: kf.GetErrorCovPost},
+		{desc: "GetTemp1()", f: kf.GetTemp1},
+		{desc: "GetTemp2()", f: kf.GetTemp2},
+		{desc: "GetTemp3()", f: kf.GetTemp3},
+		{desc: "GetTemp4()", f: kf.GetTemp4},
+		{desc: "GetTemp5()", f: kf.GetTemp5},
+	}
+	for _, test := range getterTests {
+		t.Run(test.desc, func(t *testing.T) {
+			if got := test.f(); got.Empty() {
+				t.Errorf("%v: returned empty, want non-Empty", test.desc)
+			} else {
+				got.Close()
+			}
+
+		})
+	}
+	kf.Close()
+}
+
+func TestKalmanFilter_Setters(t *testing.T) {
+	kf := NewKalmanFilter(2, 1)
+	tests := []struct {
+		desc string
+		f    func(Mat)
+	}{
+		{desc: "SetStatePre()", f: kf.SetStatePre},
+		{desc: "SetStatePost()", f: kf.SetStatePost},
+		{desc: "SetTransitionMatrix()", f: kf.SetTransitionMatrix},
+		{desc: "SetControlMatrix()", f: kf.SetControlMatrix},
+		{desc: "SetMeasurementMatrix()", f: kf.SetMeasurementMatrix},
+		{desc: "SetProcessNoiseCov()", f: kf.SetProcessNoiseCov},
+		{desc: "SetMeasurementNoiseCov()", f: kf.SetMeasurementNoiseCov},
+		{desc: "SetErrorCovPre()", f: kf.SetErrorCovPre},
+		{desc: "SetGain()", f: kf.SetGain},
+		{desc: "SetErrorCovPost()", f: kf.SetErrorCovPost},
+	}
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			testMat := Ones(2, 1, MatTypeCV32F)
+			// Just run this to make sure the execution doesn't fail.
+			test.f(testMat)
+			testMat.Close()
+		})
+	}
+	kf.Close()
 }

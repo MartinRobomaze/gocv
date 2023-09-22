@@ -1930,6 +1930,48 @@ func TestWarpPerspective(t *testing.T) {
 	}
 }
 
+func TestWarpPerspectiveWithParams(t *testing.T) {
+	img := IMRead("images/gocvlogo.jpg", IMReadUnchanged)
+	defer img.Close()
+
+	w := img.Cols()
+	h := img.Rows()
+
+	s := []image.Point{
+		image.Pt(0, 0),
+		image.Pt(10, 5),
+		image.Pt(10, 10),
+		image.Pt(5, 10),
+	}
+	pvs := NewPointVectorFromPoints(s)
+	defer pvs.Close()
+
+	d := []image.Point{
+		image.Pt(0, 0),
+		image.Pt(10, 0),
+		image.Pt(10, 10),
+		image.Pt(0, 10),
+	}
+	pvd := NewPointVectorFromPoints(d)
+	defer pvd.Close()
+
+	m := GetPerspectiveTransform(pvs, pvd)
+	defer m.Close()
+
+	dst := NewMat()
+	defer dst.Close()
+
+	WarpPerspectiveWithParams(img, &dst, m, image.Pt(w, h), InterpolationLinear, BorderConstant, color.RGBA{})
+
+	if dst.Cols() != w {
+		t.Errorf("TestWarpPerspectiveWithParams(): unexpected cols = %v, want = %v", dst.Cols(), w)
+	}
+
+	if dst.Rows() != h {
+		t.Errorf("TestWarpPerspectiveWithParams(): unexpected rows = %v, want = %v", dst.Rows(), h)
+	}
+}
+
 func TestDrawContours(t *testing.T) {
 	img := NewMatWithSize(100, 200, MatTypeCV8UC1)
 	defer img.Close()
@@ -1956,6 +1998,57 @@ func TestDrawContours(t *testing.T) {
 	}
 	if v := img.GetUCharAt(25, 125); v != 255 {
 		t.Errorf("TestDrawContours(): contour has not been drawn (value = %v, want = %v)", v, 255)
+	}
+}
+
+func TestDrawContoursWithParams(t *testing.T) {
+	img := NewMatWithSize(200, 200, MatTypeCV8UC1)
+	defer img.Close()
+
+	// Draw circle
+	white := color.RGBA{255, 255, 255, 255}
+	black := color.RGBA{0, 0, 0, 255}
+	Circle(&img, image.Pt(100, 100), 80, white, -1)
+	Circle(&img, image.Pt(100, 100), 55, black, -1)
+	Circle(&img, image.Pt(100, 100), 30, white, -1)
+
+	hierarchy := NewMat()
+	defer hierarchy.Close()
+	contours := FindContoursWithParams(img, &hierarchy, RetrievalTree, ChainApproxSimple)
+	defer contours.Close()
+
+	// Draw contours by different line-type and assert value
+	cases := []struct {
+		name        string
+		lineType    LineType
+		expectUChar uint8
+	}{
+		{
+			name:        "draw by Line4", // 4 connected line
+			lineType:    Line4,
+			expectUChar: 255,
+		},
+		{
+			name:        "draw by line8", // 8 connected line
+			lineType:    Line8,
+			expectUChar: 0,
+		},
+		{
+			name:        "draw by line-AA", // anti-aliased line
+			lineType:    LineAA,
+			expectUChar: 68,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			bg := NewMatWithSize(img.Rows(), img.Cols(), MatTypeCV8UC1)
+			defer bg.Close()
+
+			DrawContoursWithParams(&bg, contours, -1, white, 1, c.lineType, hierarchy, 0, image.Pt(0, 0))
+			if v := bg.GetUCharAt(22, 88); v != c.expectUChar {
+				t.Errorf("TestDrawContoursWithParams(): contour value expect %v but got %v", c.expectUChar, v)
+			}
+		})
 	}
 }
 
@@ -2246,6 +2339,29 @@ func TestFitLine(t *testing.T) {
 	}
 }
 
+func TestMatchShapes(t *testing.T) {
+	points1 := []image.Point{image.Pt(0, 0), image.Pt(1, 0), image.Pt(2, 2), image.Pt(3, 3), image.Pt(3, 4)}
+	points2 := []image.Point{image.Pt(0, 0), image.Pt(1, 0), image.Pt(2, 3), image.Pt(3, 3), image.Pt(3, 5)}
+	lowerSimilarity := 2.0
+	upperSimilarity := 3.0
+
+	contour1 := NewPointVectorFromPoints(points1)
+	defer contour1.Close()
+
+	contour2 := NewPointVectorFromPoints(points2)
+	defer contour2.Close()
+
+	similarity := MatchShapes(contour1, contour2, ContoursMatchI2, 0)
+
+	if similarity < lowerSimilarity {
+		t.Errorf("MatchShapes(): incorrect calculation, should be more than %f, got %f", lowerSimilarity, similarity)
+	}
+
+	if similarity > upperSimilarity {
+		t.Errorf("MatchShapes(): incorrect calculation, should be lower than %f, got %f", upperSimilarity, similarity)
+	}
+}
+
 func TestInvertAffineTransform(t *testing.T) {
 	src := NewMatWithSize(2, 3, MatTypeCV32F)
 	defer src.Close()
@@ -2516,7 +2632,7 @@ func TestMatToImageYUVWithParams(t *testing.T) {
 	}
 }
 
-//Tests that image is the same after converting to Mat and back to Image
+// Tests that image is the same after converting to Mat and back to Image
 func TestImageToMatRGBA(t *testing.T) {
 	file, err := os.Open("images/gocvlogo.png")
 	if err != nil {
@@ -2550,7 +2666,7 @@ func TestImageToMatRGBA(t *testing.T) {
 	defer mat3.Close()
 }
 
-//Tests that image is the same after converting to Mat and back to Image
+// Tests that image is the same after converting to Mat and back to Image
 func TestImageToMatRGB(t *testing.T) {
 	file, err := os.Open("images/gocvlogo.jpg")
 	if err != nil {

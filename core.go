@@ -672,6 +672,11 @@ func (m *Mat) Step() int {
 	return int(C.Mat_Step(m.p))
 }
 
+// ElemSize returns the matrix element size in bytes.
+func (m *Mat) ElemSize() int {
+	return int(C.Mat_ElemSize(m.p))
+}
+
 // GetUCharAt returns a value from a specific row/col
 // in this Mat expecting it to be of type uchar aka CV_8U.
 func (m *Mat) GetUCharAt(row int, col int) uint8 {
@@ -1218,6 +1223,20 @@ func EigenNonSymmetric(src Mat, eigenvalues *Mat, eigenvectors *Mat) {
 	C.Mat_EigenNonSymmetric(src.p, eigenvalues.p, eigenvectors.p)
 }
 
+// PCACompute performs PCA.
+//
+// The computed eigenvalues are sorted from the largest to the smallest and the corresponding
+// eigenvectors are stored as eigenvectors rows.
+//
+// Note: Calling with maxComponents == 0 (opencv default) will cause all components to be retained.
+//
+// For further details, please see:
+// https://docs.opencv.org/4.x/d2/de8/group__core__array.html#ga27a565b31d820b05dcbcd47112176b6e
+//
+func PCACompute(src Mat, mean *Mat, eigenvectors *Mat, eigenvalues *Mat, maxComponents int) {
+	C.Mat_PCACompute(src.p, mean.p, eigenvectors.p, eigenvalues.p, C.int(maxComponents))
+}
+
 // Exp calculates the exponent of every array element.
 //
 // For further details, please see:
@@ -1756,6 +1775,24 @@ func Reduce(src Mat, dst *Mat, dim int, rType ReduceTypes, dType MatType) {
 	C.Mat_Reduce(src.p, dst.p, C.int(dim), C.int(rType), C.int(dType))
 }
 
+// Finds indices of max elements along provided axis.
+//
+// For further details, please see:
+// https://docs.opencv.org/master/d2/de8/group__core__array.html#gaa87ea34d99bcc5bf9695048355163da0
+//
+func ReduceArgMax(src Mat, dst *Mat, axis int, lastIndex bool) {
+	C.Mat_ReduceArgMax(src.p, dst.p, C.int(axis), C.bool(lastIndex))
+}
+
+// Finds indices of min elements along provided axis.
+//
+// For further details, please see:
+// https://docs.opencv.org/master/d2/de8/group__core__array.html#gaeecd548276bfb91b938989e66b722088
+//
+func ReduceArgMin(src Mat, dst *Mat, axis int, lastIndex bool) {
+	C.Mat_ReduceArgMin(src.p, dst.p, C.int(axis), C.bool(lastIndex))
+}
+
 // Repeat fills the output array with repeated copies of the input array.
 //
 // For further details, please see:
@@ -2123,6 +2160,9 @@ func NewPointsVector() PointsVector {
 // NewPointsVectorFromPoints returns a new PointsVector that has been
 // initialized to a slice of slices of image.Point.
 func NewPointsVectorFromPoints(pts [][]image.Point) PointsVector {
+	if len(pts) <= 0 {
+		return NewPointsVector()
+	}
 	points := make([]C.struct_Points, len(pts))
 
 	for i, pt := range pts {
@@ -2811,4 +2851,14 @@ func (pvs Points3fVector) Append(pv Point3fVector) {
 // Close closes and frees memory for this Points3fVector.
 func (pvs Points3fVector) Close() {
 	C.Points3fVector_Close(pvs.p)
+}
+
+// Set the number of threads for OpenCV.
+func SetNumThreads(n int) {
+	C.SetNumThreads(C.int(n))
+}
+
+// Get the number of threads for OpenCV.
+func GetNumThreads() int {
+	return int(C.GetNumThreads())
 }
